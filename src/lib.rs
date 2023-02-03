@@ -6,6 +6,7 @@ use glam::Vec2;
 pub struct Solver {
     segments: Segments,
     tolerance: f32,
+    max_iterations: usize,
 }
 
 impl Solver {
@@ -29,6 +30,7 @@ impl Solver {
         Self {
             segments: Segments(segments),
             tolerance: 0.01,
+            max_iterations: 1000,
         }
     }
 
@@ -46,8 +48,7 @@ impl Solver {
         last.is_edge = true;
         last.translation = goal;
 
-        let mut iteration = 0;
-
+        let mut iterations = 0;
         loop {
             // Backwards
             for (b, a) in self.segments.backwards() {
@@ -79,10 +80,13 @@ impl Solver {
             }
 
             if Vec2::distance(actual, goal) <= self.tolerance {
-                break Some(actual);
+                return Some(actual);
             }
 
-            iteration += 1;
+            iterations += 1;
+            if iterations == self.max_iterations {
+                return None;
+            }
         }
     }
 }
