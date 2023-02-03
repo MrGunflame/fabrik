@@ -95,6 +95,13 @@ where
             }
         }
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = Joint<T>> + '_ {
+        self.segments.iter().map(|seg| Joint {
+            translation: seg.translation,
+            length: seg.length,
+        })
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
