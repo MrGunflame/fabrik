@@ -1,18 +1,26 @@
+mod vector;
+
+pub use vector::Vector;
+
 use std::ops::{Deref, DerefMut};
 
-use glam::Vec2;
-
 #[derive(Clone, Debug)]
-pub struct Solver {
-    segments: Segments,
+pub struct Solver<T>
+where
+    T: Vector,
+{
+    segments: Segments<T>,
     tolerance: f32,
     max_iterations: usize,
 }
 
-impl Solver {
-    pub fn new<T>(segments: T) -> Self
+impl<T> Solver<T>
+where
+    T: Vector,
+{
+    pub fn new<I>(segments: I) -> Self
     where
-        T: IntoIterator<Item = Joint>,
+        I: IntoIterator<Item = Joint<T>>,
     {
         let mut segments: Vec<_> = segments
             .into_iter()
@@ -34,25 +42,25 @@ impl Solver {
         }
     }
 
-    pub fn solve(&mut self, goal: Vec2) -> Option<Vec2> {
+    pub fn solve(&mut self, target: T) -> Option<T> {
         // Distance is greater than the length of all bones combined.
         // The point is unreachable.
-        if Vec2::length(goal - self.segments[0].translation).abs() > self.segments.length() {
+        if T::length(target - self.segments[0].translation).abs() > self.segments.length() {
             return None;
         }
 
-        let mut actual = Vec2::NAN;
+        let mut actual = T::NAN;
 
         // Assign the last point to the end effector.
         let last = self.segments.last_mut().unwrap();
         last.is_edge = true;
-        last.translation = goal;
+        last.translation = target;
 
         let mut iterations = 0;
         loop {
             // Backwards
             for (b, a) in self.segments.backwards() {
-                let delta = Vec2::normalize(a.translation - b.translation) * a.length;
+                let delta = T::normalize(a.translation - b.translation) * a.length;
 
                 let new_a = b.translation + delta;
 
@@ -64,72 +72,73 @@ impl Solver {
 
             // Forwards
             for (a, b) in self.segments.forwards() {
-                let delta = Vec2::normalize(b.translation - a.translation) * a.length;
+                let delta = T::normalize(b.translation - a.translation) * a.length;
 
                 let new_b = a.translation + delta;
 
                 if !b.is_edge {
                     b.translation = new_b;
                 } else {
-                    // Catch potential deadlocks when the point doesn't change.
-                    debug_assert_ne!(actual, new_b);
-
                     // Calculate offset from goal.
                     actual = new_b;
                 }
             }
 
-            if Vec2::distance(actual, goal) <= self.tolerance {
+            if T::distance(actual, target) <= self.tolerance {
                 return Some(actual);
             }
 
             iterations += 1;
             if iterations == self.max_iterations {
-                return None;
+                // Return the closest estimated point.
+                return Some(actual);
             }
         }
     }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Joint {
-    pub translation: Vec2,
+pub struct Joint<T>
+where
+    T: Vector,
+{
+    pub translation: T,
     pub length: f32,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-struct Segment {
+struct Segment<T> {
     is_edge: bool,
     length: f32,
-    translation: Vec2,
+    translation: T,
 }
 
 #[derive(Clone, Debug)]
-struct Segments(Vec<Segment>);
+struct Segments<T>(Vec<Segment<T>>);
 
-impl Segments {
+impl<T> Segments<T> {
     fn length(&self) -> f32 {
         self.0.iter().fold(0.0, |acc, seg| acc + seg.length)
     }
 
-    fn backwards(&mut self) -> Backwards<'_, Segment> {
+    fn backwards(&mut self) -> Backwards<'_, Segment<T>> {
         Backwards::new(self)
     }
 
-    fn forwards(&mut self) -> Forwards<'_, Segment> {
+    fn forwards(&mut self) -> Forwards<'_, Segment<T>> {
         Forwards::new(self)
     }
 }
 
-impl Deref for Segments {
-    type Target = Vec<Segment>;
+impl<T> Deref for Segments<T> {
+    type Target = Vec<Segment<T>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for Segments {
+impl<T> DerefMut for Segments<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -272,6 +281,49 @@ mod tests {
         let res = body.solve(Vec2::new(10.0, 0.0)).unwrap();
         assert_tolerance!(res.x, 10.0);
         assert_tolerance!(res.y, 0.0);
+
+        let mut body = Solver::new([
+            Joint {
+                translation: Vec2::new(0.0, 0.0),
+                length: 1.0,
+            },
+            Joint {
+                translation: Vec2::new(1.0, 0.0),
+                length: 1.0,
+            },
+            Joint {
+                translation: Vec2::new(2.0, 0.0),
+                length: 1.0,
+            },
+            Joint {
+                translation: Vec2::new(3.0, 0.0),
+                length: 1.0,
+            },
+            Joint {
+                translation: Vec2::new(4.0, 0.0),
+                length: 1.0,
+            },
+            Joint {
+                translation: Vec2::new(5.0, 0.0),
+                length: 1.0,
+            },
+            Joint {
+                translation: Vec2::new(7.0, 0.0),
+                length: 1.0,
+            },
+            Joint {
+                translation: Vec2::new(8.0, 0.0),
+                length: 1.0,
+            },
+            Joint {
+                translation: Vec2::new(9.0, 0.0),
+                length: 1.0,
+            },
+        ]);
+
+        let res = body.solve(Vec2::new(5.0, 5.0)).unwrap();
+        assert_tolerance!(res.x, 5.0);
+        assert_tolerance!(res.y, 5.0);
     }
 
     #[test]
