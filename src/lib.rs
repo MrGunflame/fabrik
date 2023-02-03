@@ -98,14 +98,14 @@ pub struct Joint {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Segment {
-    pub is_edge: bool,
-    pub length: f32,
-    pub translation: Vec2,
+struct Segment {
+    is_edge: bool,
+    length: f32,
+    translation: Vec2,
 }
 
 #[derive(Clone, Debug)]
-pub struct Segments(Vec<Segment>);
+struct Segments(Vec<Segment>);
 
 impl Segments {
     fn length(&self) -> f32 {
