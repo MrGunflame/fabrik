@@ -28,7 +28,7 @@ impl Solver {
 
         Self {
             segments: Segments(segments),
-            tolerance: 1.0,
+            tolerance: 0.01,
         }
     }
 
@@ -51,15 +51,9 @@ impl Solver {
         loop {
             // Backwards
             for (b, a) in self.segments.backwards() {
-                dbg!(&b, &a);
-
                 let delta = Vec2::normalize(a.translation - b.translation) * a.length;
 
-                dbg!(delta);
-
-                let new_a = a.translation + delta;
-
-                dbg!(new_a);
+                let new_a = b.translation + delta;
 
                 // Don't overwrite the starting point.
                 if !a.is_edge {
@@ -67,13 +61,11 @@ impl Solver {
                 }
             }
 
-            panic!();
-
             // Forwards
             for (a, b) in self.segments.forwards() {
                 let delta = Vec2::normalize(b.translation - a.translation) * a.length;
 
-                let new_b = b.translation + delta;
+                let new_b = a.translation + delta;
 
                 if !b.is_edge {
                     b.translation = new_b;
@@ -85,11 +77,6 @@ impl Solver {
                     actual = new_b;
                 }
             }
-
-            dbg!(&self.segments);
-            dbg!(iteration);
-
-            dbg!(actual);
 
             if Vec2::distance(actual, goal) <= self.tolerance {
                 break Some(actual);
@@ -237,6 +224,14 @@ mod tests {
 
     use super::{Backwards, Forwards, Joint, Solver};
 
+    macro_rules! assert_tolerance {
+        ($lhs:expr, $rhs:expr) => {
+            if !($lhs >= $rhs - 0.01 && $lhs <= 10.0 + 0.01) {
+                assert_eq!($lhs, $rhs);
+            }
+        };
+    }
+
     #[test]
     fn test_unreachable() {
         let mut body = Solver::new([
@@ -270,7 +265,9 @@ mod tests {
             },
         ]);
 
-        assert_eq!(body.solve(Vec2::new(10.0, 0.0)), Some(Vec2::new(0.0, 0.0)));
+        let res = body.solve(Vec2::new(10.0, 0.0)).unwrap();
+        assert_tolerance!(res.x, 10.0);
+        assert_tolerance!(res.y, 0.0);
     }
 
     #[test]
