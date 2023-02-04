@@ -49,6 +49,13 @@ where
             return None;
         }
 
+        // If the end effector is already within tolerance of the current point,
+        // we don't need to solve anything.
+        let last = self.segments.last().unwrap().translation;
+        if last.distance(target).abs() <= self.tolerance {
+            return Some(last);
+        }
+
         let mut actual = T::NAN;
 
         // Assign the last point to the end effector.
